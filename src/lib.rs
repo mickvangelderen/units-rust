@@ -4,102 +4,119 @@ use ::std::cmp;
 use ::std::fmt;
 use ::std::convert;
 
-pub trait Unit {
-    const UNIT: &'static str;
-}
+pub enum N3 {}
+pub enum N2 {}
+pub enum N1 {}
+pub enum Z0 {}
+pub enum P1 {}
+pub enum P2 {}
+pub enum P3 {}
 
-pub struct Measure<V, U>(V, PhantomData<U>);
+pub struct Quantity<V, D1, D2>(V, PhantomData<(D1, D2)>);
 
-#[macro_export]
-macro_rules! impl_unit {
-    ($UnitName:ident, $ShortName:ident, $short:expr) => (
-        #[derive(Debug)]
-        pub enum $UnitName {}
+pub type Length<V> = Quantity<V, P1, Z0>;
 
-        impl Unit for $UnitName {
-            const UNIT: &'static str = $short;
+pub type Time<V> = Quantity<V, Z0, P1>;
+
+pub type Velocity<V> = Quantity<V, P1, N1>;
+
+macro_rules! impl_dim_mul {
+    ($L:ident * $R:ident = $O:ident) => (
+        impl ops::Mul<$R> for $L {
+            type Output = $O;
+            fn mul(self, _: $R) -> Self::Output {
+                unreachable!()
+            }
         }
-
-        pub type $ShortName<T> = Measure<T, $UnitName>;
     )
 }
 
-impl<V, U> Measure<V, U> {
-    pub fn value(self) -> V {
-        self.0
-    }
-}
+// impl_dim_mul!(N3 * N3 = N6);
+// impl_dim_mul!(N3 * N2 = N5);
+// impl_dim_mul!(N3 * N1 = N4);
+impl_dim_mul!(N3 * Z0 = N3);
+impl_dim_mul!(N3 * P1 = N2);
+impl_dim_mul!(N3 * P2 = N1);
+impl_dim_mul!(N3 * P3 = Z0);
 
-impl<V, U> convert::From<V> for Measure<V, U> {
-    fn from(v: V) -> Self {
-        Measure(v, PhantomData)
-    }
-}
-
-impl<V: fmt::Debug, U: Unit> fmt::Debug for Measure<V, U> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}{}", self.0, U::UNIT)
-    }
-}
-
-// TODO: Derive other operators?
-impl<V: ops::Add, U> ops::Add for Measure<V, U> {
-    type Output = Measure<V::Output, U>;
-
-    fn add(self, other: Self) -> Self::Output {
-        (self.0 + other.0).into()
-    }
-}
-
-// TODO: Derive other comparison operators.
-impl<V: cmp::PartialEq, U> cmp::PartialEq for Measure<V, U> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-#[macro_export]
-macro_rules! impl_op {
-    ($L:ident / $R:ident = $O:ident) => (
-        impl_op!(Div, div, $L, $R, $O);
-    );
-
-    ($L:ident * $R:ident = $O:ident) => (
-        impl_op!(Mul, mul, $L, $R, $O);
-    );
-
-    ($Op:ident, $OpMethod:ident, $L:ident, $R:ident, $O:ident) => (
-        impl<V: ops::$Op> ops::$Op<$R<V>> for $L<V> {
-            type Output = $O<V::Output>;
-
-            fn $OpMethod(self, other: $R<V>) -> Self::Output {
-                ops::$Op::$OpMethod(self.0, other.0).into()
+macro_rules! impl_dim_div {
+    ($L:ty, $R:ty, $O:ty) => (
+        impl ops::Div<$R> for $L {
+            type Output = $O;
+            fn div(self, _: $R) -> Self::Output {
+                unreachable!()
             }
         }
     );
+}
+
+impl_dim_div!(N3, N3, Z0);
+impl_dim_div!(N3, N2, N1);
+impl_dim_div!(N3, N1, N2);
+impl_dim_div!(N3, Z0, N3);
+// impl_dim_div!(N3, P1, N4);
+// impl_dim_div!(N3, P2, N5);
+// impl_dim_div!(N3, P3, N6);
+
+impl_dim_div!(N2, N3, P1);
+impl_dim_div!(N2, N2, Z0);
+impl_dim_div!(N2, N1, N1);
+impl_dim_div!(N2, Z0, N2);
+impl_dim_div!(N2, P1, N3);
+// impl_dim_div!(N2, P2, N4);
+// impl_dim_div!(N2, P3, N5);
+
+impl_dim_div!(N1, N3, P2);
+impl_dim_div!(N1, N2, P1);
+impl_dim_div!(N1, N1, Z0);
+impl_dim_div!(N1, Z0, N1);
+impl_dim_div!(N1, P1, N2);
+impl_dim_div!(N1, P2, N3);
+// impl_dim_div!(N1, P3, N4);
+
+impl ops::Div<Z0> for P1 {
+    type Output = N1;
+    fn div(self, _: Z0) -> Self::Output {
+        unreachable!()
+    }
+}
+
+impl ops::Div<P1> for Z0 {
+    type Output = Z0;
+    fn div(self, _: P1) -> Self::Output {
+        unreachable!()
+    }
+}
+
+impl<V: ops::Div, Q1D1, Q1D2, Q2D1, Q2D2> ops::Div<Quantity<V, Q2D1, Q2D2>> for Quantity<V, Q1D1, Q1D2>
+    where V: ops::Div,
+          Q1D1: ops::Div<Q2D1>,
+          Q1D2: ops::Div<Q2D2>,
+{
+    type Output = Quantity<
+            V::Output,
+            <Q1D1 as ops::Div<Q2D1>>::Output,
+            <Q1D2 as ops::Div<Q2D2>>::Output
+        >;
+
+    fn div(self, other: Quantity<V, Q2D1, Q2D2>) -> Self::Output {
+        (self.0/other.0).into()
+    }
+}
+
+impl<V, D1, D2> convert::From<V> for Quantity<V, D1, D2> {
+    fn from(v: V) -> Self {
+        Quantity(v, PhantomData)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    impl_unit!(MeterUnit, Meter, "m");
-    impl_unit!(SecondUnit, Second, "s");
-    impl_unit!(MeterPerSecondUnit, MeterPerSecond, "m/s");
-    impl_unit!(SquareMeterUnit, SquareMeter, "m^2");
-
-    impl_op!(Meter / Second = MeterPerSecond);
-    impl_op!(Meter * Meter = SquareMeter);
-
     #[test]
     fn it_works() {
-        let m1: Meter<_> = 10f32.into();
-        let m2 = Meter::from(40f32);
-        assert_eq!(SquareMeter::from(400f32), m1*m2);
-
-        assert_eq!(
-            Meter::from(5000f32)/Second::from(60f32*25f32),
-            MeterPerSecond::from(5000f32/(60.0*25.0))
-        );
+        let m1: Length<_> = 10f32.into();
+        let m2 = Length::from(40f32);
     }
 }
