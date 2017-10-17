@@ -58,7 +58,16 @@ impl<V: cmp::PartialEq, U> cmp::PartialEq for Measure<V, U> {
     }
 }
 
-macro_rules! impl_op_raw {
+#[macro_export]
+macro_rules! impl_op {
+    ($L:ident / $R:ident = $O:ident) => (
+        impl_op!(Div, div, $L, $R, $O);
+    );
+
+    ($L:ident * $R:ident = $O:ident) => (
+        impl_op!(Mul, mul, $L, $R, $O);
+    );
+
     ($Op:ident, $OpMethod:ident, $L:ident, $R:ident, $O:ident) => (
         impl<V: ops::$Op> ops::$Op<$R<V>> for $L<V> {
             type Output = $O<V::Output>;
@@ -67,17 +76,6 @@ macro_rules! impl_op_raw {
                 ops::$Op::$OpMethod(self.0, other.0).into()
             }
         }
-    );
-}
-
-#[macro_export]
-macro_rules! impl_op {
-    ($L:ident / $R:ident = $O:ident) => (
-        impl_op_raw!(Div, div, $L, $R, $O);
-    );
-
-    ($L:ident * $R:ident = $O:ident) => (
-        impl_op_raw!(Mul, mul, $L, $R, $O);
     );
 }
 
