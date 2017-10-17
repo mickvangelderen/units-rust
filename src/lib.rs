@@ -99,7 +99,7 @@ mod tests {
 
         assert_eq!(
             Meter::from(5000f32)/Second::from(60f32*25f32),
-            MeterPerSecond::from(5000f32/60.0/25.0)
+            MeterPerSecond::from(5000f32/(60.0*25.0))
         );
     }
 }
